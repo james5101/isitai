@@ -43,6 +43,25 @@ def test_framer_html_comment():
     assert any("Framer HTML comment" in e for e in result.evidence)
 
 
+def test_v0_dev_generator():
+    html = '<html><head><meta name="generator" content="v0.dev"></head><body></body></html>'
+    result = analyzer.analyze(html)
+    assert result.score == 95
+    assert any("v0.dev" in e for e in result.evidence)
+
+
+def test_bolt_generator():
+    html = '<html><head><meta name="generator" content="bolt"></head><body></body></html>'
+    result = analyzer.analyze(html)
+    assert result.score == 95
+
+
+def test_lovable_generator():
+    html = '<html><head><meta name="generator" content="lovable"></head><body></body></html>'
+    result = analyzer.analyze(html)
+    assert result.score == 95
+
+
 def test_plain_site_scores_zero():
     html = '<html><head><title>My hand-coded site</title></head><body><p>Hello</p></body></html>'
     result = analyzer.analyze(html)

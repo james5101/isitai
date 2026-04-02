@@ -80,6 +80,30 @@ _FINGERPRINTS: list[tuple[str, callable]] = [
         "WordPress generator meta tag",
         lambda soup: _check_meta_generator(soup, "wordpress"),
     ),
+
+    # --- v0.dev (Vercel's AI coding tool) ---
+    (
+        "v0.dev generator meta tag",
+        lambda soup: _check_meta_generator(soup, "v0.dev"),
+    ),
+
+    # --- Bolt (StackBlitz AI coding tool) ---
+    (
+        "Bolt generator meta tag",
+        lambda soup: _check_meta_generator(soup, "bolt"),
+    ),
+
+    # --- Lovable ---
+    (
+        "Lovable generator meta tag",
+        lambda soup: _check_meta_generator(soup, "lovable"),
+    ),
+
+    # --- Cursor (AI code editor, sometimes embeds attribution) ---
+    (
+        "Cursor generator meta tag",
+        lambda soup: _check_meta_generator(soup, "cursor"),
+    ),
 ]
 
 
