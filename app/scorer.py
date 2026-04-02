@@ -65,16 +65,24 @@ def run_analyzers(html: str, base_url: str | None = None) -> AnalysisResponse:
     for key, analyzer in zip(_ANALYZER_KEYS, ANALYZERS):
         result = analyzer.analyze(html)
         results[key] = result
-        weighted_sum += result.score * result.weight
-        total_weight += result.weight
+        # Only count an analyzer if it found something (score > 0).
+        # A score of 0 means "no signal found here" — the analyzer is abstaining,
+        # not voting human. Including zero-score weights in the denominator would
+        # dilute high-confidence signals from analyzers that did fire.
+        # Think of it like a jury: a juror who says "I have no opinion" shouldn't
+        # cancel out one who says "definitely guilty."
+        if result.score > 0:
+            weighted_sum += result.score * result.weight
+            total_weight += result.weight
 
     # Bundle scan — only fires for Vite SPA shells (thin HTML + hashed JS bundle).
     # Fetches the main JS bundle and searches for vibe-coding library signatures.
     # Returns weight=0.0 and is excluded from scoring if skipped or failed.
     bundle_result, bundle_techs = fetch_and_scan(html, base_url)
     results["bundle_scan"] = bundle_result
-    weighted_sum += bundle_result.score * bundle_result.weight
-    total_weight += bundle_result.weight
+    if bundle_result.score > 0:
+        weighted_sum += bundle_result.score * bundle_result.weight
+        total_weight += bundle_result.weight
 
     final_score = int(weighted_sum / total_weight) if total_weight > 0 else 0
 

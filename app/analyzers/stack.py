@@ -36,6 +36,57 @@ _NEXTJS_PATTERNS = [
     re.compile(r'__NEXT_DATA__', re.I),
 ]
 
+# --- AI SDK packages in import maps ---
+# These packages loaded via an import map mean someone is running an AI SDK
+# directly in the browser — an extremely strong signal.
+# import maps + esm.sh is also the pattern used by Gemini Canvas, bolt.new,
+# and other AI coding tools that skip the build step entirely.
+_AI_SDK_PACKAGES = [
+    "@google/genai",
+    "@anthropic-ai/sdk",
+    "openai",
+    "@mistralai/mistralai",
+    "@cohere-ai/cohere-sdk",
+]
+
+_IMPORTMAP_RE = re.compile(
+    r'<script[^>]+type=["\']importmap["\'][^>]*>(.*?)</script>',
+    re.I | re.DOTALL,
+)
+
+# --- esm.sh / skypack CDN (no-build pattern) ---
+# Real production apps use a build pipeline. Loading React or Three.js
+# directly from esm.sh/skypack in an import map means no build step —
+# a pattern almost exclusive to AI coding tools and throwaway prototypes.
+_ESM_CDN_RE = re.compile(r'esm\.sh|cdn\.skypack\.dev', re.I)
+
+# --- Inline Tailwind config ---
+# AI tools use the Tailwind CDN + an inline config script.
+# Real projects use PostCSS/Vite plugin — never this pattern in production.
+_TAILWIND_CONFIG_RE = re.compile(r'tailwind\.config\s*=', re.I)
+
+# --- CDN-loaded frameworks ---
+# Loading React/Vue/Angular from unpkg or jsdelivr via a plain <script> tag
+# means there's no build pipeline. Common in AI-generated demos/prototypes.
+_CDN_FRAMEWORK_RE = re.compile(
+    r'(unpkg\.com|cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com)'
+    r'.*?(react|vue|angular|svelte|three\.js)',
+    re.I,
+)
+
+# --- Direct AI API calls ---
+# If a site calls an AI API directly from the browser, it was almost
+# certainly built with AI assistance. No false positives — real devs
+# never expose AI API keys client-side on purpose.
+_AI_API_ENDPOINTS = [
+    ("Google Gemini",    "generativelanguage.googleapis.com"),
+    ("OpenAI",           "api.openai.com"),
+    ("Anthropic",        "api.anthropic.com"),
+    ("Mistral",          "api.mistral.ai"),
+    ("Cohere",           "api.cohere.ai"),
+    ("Groq",             "api.groq.com"),
+]
+
 
 class StackAnalyzer(BaseAnalyzer):
     """
@@ -107,6 +158,45 @@ class StackAnalyzer(BaseAnalyzer):
         if "fonts.googleapis.com" in html and "Inter" in html:
             points += 10
             evidence.append("Inter font via Google Fonts (common AI default)")
+
+        # --- Check 7: AI SDK packages in import map ---
+        # An import map loading @google/genai, openai, etc. means an AI SDK
+        # is running directly in the browser — near-certain AI involvement.
+        # This pattern is common in Gemini Canvas, bolt.new, and AI tools
+        # that skip the build step and load modules straight from esm.sh.
+        importmap_match = _IMPORTMAP_RE.search(html)
+        if importmap_match:
+            importmap_content = importmap_match.group(1)
+
+            # AI SDK packages — near-certain signal
+            found_sdks = [pkg for pkg in _AI_SDK_PACKAGES if pkg in importmap_content]
+            if found_sdks:
+                points += 85
+                evidence.append(f"AI SDK(s) in import map: {', '.join(found_sdks)}")
+
+            # esm.sh / skypack CDN without AI SDK — moderate signal
+            elif _ESM_CDN_RE.search(importmap_content):
+                points += 30
+                evidence.append("Import map using esm.sh/skypack CDN (no build tooling)")
+
+        # --- Check 8: Inline Tailwind config ---
+        if _TAILWIND_CONFIG_RE.search(html):
+            points += 25
+            evidence.append("Inline tailwind.config (CDN + config pattern, not a real build)")
+
+        # --- Check 9: CDN-loaded frameworks ---
+        cdn_hits = _CDN_FRAMEWORK_RE.findall(html)
+        if cdn_hits:
+            points += 25
+            cdn_names = list(dict.fromkeys(f"{fw} via {cdn}" for cdn, fw in cdn_hits))
+            evidence.append(f"Framework loaded from CDN: {', '.join(cdn_names[:3])}")
+
+        # --- Check 10: Direct AI API calls in page source ---
+        # Search the full HTML (including inline scripts) for AI API hostnames.
+        found_apis = [name for name, host in _AI_API_ENDPOINTS if host in html]
+        if found_apis:
+            points += 80
+            evidence.append(f"Direct AI API call in page source: {', '.join(found_apis)}")
 
         score = min(100, points)
         return AnalyzerResult(score=score, weight=self.weight, evidence=evidence)

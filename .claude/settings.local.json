@@ -9,7 +9,8 @@
       "Bash(python -m pytest tests/test_api.py -q)",
       "WebFetch(domain:www.aftermark.ai)",
       "Bash(dir D:codeisitai)",
-      "Bash(python3 -c \":*)"
+      "Bash(python3 -c \":*)",
+      "WebFetch(domain:slamdunk-five.vercel.app)"
     ]
   }
 }

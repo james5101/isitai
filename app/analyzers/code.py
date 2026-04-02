@@ -68,6 +68,20 @@ class CodeAnalyzer(BaseAnalyzer):
                         evidence.append(f"AI tool data attribute: {attr}")
                         break
 
+        # Check 4: Single large inline <script> block
+        # AI tools often dump all app logic into one big inline script rather
+        # than separate files. We flag inline scripts over 2KB as suspicious —
+        # that's too large to be a snippet but too inline to be intentional.
+        inline_scripts = soup.find_all("script", src=False)
+        large_inline = [s for s in inline_scripts if len(s.get_text()) > 2_000]
+        if large_inline:
+            signals += 1
+            total_chars = sum(len(s.get_text()) for s in large_inline)
+            evidence.append(
+                f"{len(large_inline)} large inline script(s) "
+                f"({total_chars:,} chars total — no separate file)"
+            )
+
         # Scale: each signal adds ~25 points, capped at 100
         score = min(100, signals * 25)
 
