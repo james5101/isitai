@@ -1,3 +1,4 @@
+import base64
 from app.models import AnalyzerResult, AnalysisResponse
 from app.analyzers.base import BaseAnalyzer
 from app.analyzers.builder import BuilderAnalyzer
@@ -8,6 +9,7 @@ from app.analyzers.ai_text import AiTextAnalyzer
 from app.analyzers.stack import StackAnalyzer
 from app.tech_detector import detect_stack
 from app.bundle_scanner import fetch_and_scan
+from app.analyzers.visual import analyze_visual
 
 # All active analyzers in one place.
 # To add a new analyzer later, just append it here.
@@ -45,7 +47,7 @@ def _score_to_label(score: int) -> str:
     return "Human-built"
 
 
-def run_analyzers(html: str, base_url: str | None = None) -> AnalysisResponse:
+def run_analyzers(html: str, base_url: str | None = None, screenshot: bytes | None = None) -> AnalysisResponse:
     """
     Run all analyzers against the HTML and return an aggregated response.
 
@@ -84,15 +86,27 @@ def run_analyzers(html: str, base_url: str | None = None) -> AnalysisResponse:
         weighted_sum += bundle_result.score * bundle_result.weight
         total_weight += bundle_result.weight
 
+    # Visual analysis — screenshot from Playwright, scored by a vision LLM.
+    # Returns weight=0.0 if Playwright isn't running or no vision key is set.
+    visual_result = analyze_visual(screenshot)
+    results["visual"] = visual_result
+    if visual_result.score > 0:
+        weighted_sum += visual_result.score * visual_result.weight
+        total_weight += visual_result.weight
+
     final_score = int(weighted_sum / total_weight) if total_weight > 0 else 0
 
     # Merge HTML-detected and bundle-detected techs, preserving order, no duplicates.
     # dict.fromkeys() is the idiomatic Python deduplication trick — like a list but ordered.
     all_techs = list(dict.fromkeys(detect_stack(html) + bundle_techs))
 
+    # Base64-encode the screenshot so it travels safely in the JSON response.
+    screenshot_b64 = base64.b64encode(screenshot).decode() if screenshot else None
+
     return AnalysisResponse(
         score=final_score,
         label=_score_to_label(final_score),
         breakdown=results,
         stack=all_techs,
+        screenshot=screenshot_b64,
     )

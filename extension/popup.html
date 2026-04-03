@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>isitai</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0f172a;
+      --surface: #1e293b;
+      --border:  #334155;
+      --text:    #f1f5f9;
+      --muted:   #94a3b8;
+      --accent:  #38bdf8;
+    }
+
+    body {
+      width: 360px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+      font-size: 13px;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo { font-size: 1rem; font-weight: 700; color: var(--accent); }
+
+    .current-url {
+      font-size: 0.7rem;
+      color: var(--muted);
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ── Content ── */
+    .content { padding: 14px; }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 28px 0;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .spin-ring {
+      width: 18px; height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Error ── */
+    .error-box {
+      background: #450a0a;
+      border: 1px solid #ef4444;
+      border-radius: 6px;
+      padding: 10px 12px;
+      color: #fca5a5;
+      font-size: 0.78rem;
+      line-height: 1.4;
+      display: none;
+    }
+
+    /* ── Score ── */
+    .score-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .score-num { font-size: 2.5rem; font-weight: 700; line-height: 1; }
+
+    .score-meta { display: flex; flex-direction: column; gap: 2px; }
+    .score-label { font-size: 0.95rem; font-weight: 600; }
+    .score-sub   { font-size: 0.72rem; color: var(--muted); }
+
+    /* ── Bar ── */
+    .bar-track {
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.5s ease;
+    }
+
+    /* ── Section label ── */
+    .section-label {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    /* ── Stack pills ── */
+    .pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 14px;
+    }
+
+    .pill {
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    /* ── Evidence ── */
+    .evidence-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 14px;
+    }
+
+    .evidence-list li {
+      font-size: 0.75rem;
+      color: var(--muted);
+      padding-left: 12px;
+      position: relative;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .evidence-list li::before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+    }
+
+    .no-signals {
+      font-size: 0.75rem;
+      color: var(--border);
+      font-style: italic;
+      margin-bottom: 14px;
+    }
+
+    /* ── Full report link ── */
+    .full-report {
+      display: block;
+      text-align: center;
+      padding: 7px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.8rem;
+      font-weight: 600;
+      transition: border-color 0.15s;
+    }
+
+    .full-report:hover { border-color: var(--accent); }
+
+    /* ── Settings ── */
+    .settings {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    .settings-toggle {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.7rem;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .settings-toggle:hover { color: var(--text); }
+
+    .settings-row {
+      display: none;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .settings-row.open { display: flex; }
+
+    .settings-row input {
+      flex: 1;
+      padding: 5px 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.72rem;
+      outline: none;
+    }
+
+    .settings-row input:focus { border-color: var(--accent); }
+
+    .settings-row button {
+      padding: 5px 10px;
+      background: var(--accent);
+      color: #0f172a;
+      border: none;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    #results { display: none; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <span class="logo">🔍 isitai</span>
+    <span class="current-url" id="current-url"></span>
+  </div>
+
+  <div class="content">
+    <div class="spinner" id="spinner">
+      <div class="spin-ring"></div>
+      Analyzing…
+    </div>
+
+    <div class="error-box" id="error-box"></div>
+
+    <div id="results">
+      <div class="score-row">
+        <div class="score-num" id="score-num">—</div>
+        <div class="score-meta">
+          <div class="score-label" id="score-label">—</div>
+          <div class="score-sub">/ 100</div>
+        </div>
+      </div>
+
+      <div class="bar-track">
+        <div class="bar-fill" id="score-bar" style="width:0%"></div>
+      </div>
+
+      <div id="stack-section"></div>
+
+      <div class="section-label">Top signals</div>
+      <ul class="evidence-list" id="evidence-list"></ul>
+
+      <a class="full-report" id="full-report-link" href="#" target="_blank">
+        View full report →
+      </a>
+    </div>
+
+    <div class="settings">
+      <button class="settings-toggle" id="settings-toggle">⚙ API settings</button>
+      <div class="settings-row" id="settings-row">
+        <input type="text" id="api-url-input" placeholder="https://isitai-nkib.onrender.com">
+        <button id="save-btn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

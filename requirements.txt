@@ -7,3 +7,5 @@ pydantic
 pytest
 pytest-asyncio
 python-dotenv
+playwright
+anthropic

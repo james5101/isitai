@@ -30,3 +30,4 @@ class AnalysisResponse(BaseModel):
     label: str           # e.g. "Likely AI", "Human-built"
     breakdown: dict[str, AnalyzerResult]  # one entry per analyzer
     stack: list[str]      # underlying stack the website is using
+    screenshot: str | None = None  # base64-encoded PNG from Playwright, or None

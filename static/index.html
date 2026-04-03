@@ -313,6 +313,49 @@
       font-style: italic;
     }
 
+    /* ── Screenshot preview ──────────────────────────── */
+    .screenshot-section {
+      margin-bottom: 1rem;
+    }
+
+    .screenshot-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.5rem;
+    }
+
+    .screenshot-img {
+      width: 100%;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      display: block;
+    }
+
+    /* ── Download button ─────────────────────────────── */
+    .download-btn {
+      display: block;
+      width: 100%;
+      margin-top: 1rem;
+      padding: 0.65rem 1rem;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .download-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
     /* ── Results container (hidden until first result) ── */
     #results { display: none; }
   </style>
@@ -364,6 +407,11 @@
         </div>
       </div>
 
+      <div class="screenshot-section" id="screenshot-section" style="display:none">
+        <div class="screenshot-label">Page screenshot</div>
+        <img class="screenshot-img" id="screenshot-img" alt="Page screenshot" />
+      </div>
+
       <div class="stack-section" id="stack-section">
         <div class="stack-label">Detected technologies</div>
         <div class="stack-pills" id="stack-pills"></div>
@@ -371,11 +419,17 @@
 
       <div class="breakdown" id="breakdown"></div>
 
+      <button class="download-btn" onclick="downloadReport()">⬇ Download Report</button>
+
     </div>
 
   </div>
 
   <script>
+    // ── Last result — used by downloadReport() ───────────────────────────────
+    let _lastResult = null;
+    let _lastUrl    = null;
+
     // ── Analyzer metadata ────────────────────────────────────────────────────
     // Display names and emojis for each analyzer key returned by the API.
     const ANALYZERS = {
@@ -385,6 +439,8 @@
       image_signals:       { name: "Image Signals",           emoji: "🖼️"  },
       ai_text:             { name: "AI Text (roberta-large)", emoji: "🤖"  },
       stack_fingerprint:   { name: "Stack Fingerprint",       emoji: "⚙️"  },
+      bundle_scan:         { name: "Bundle Scan",             emoji: "📦"  },
+      visual:              { name: "Visual Analysis",         emoji: "🎨"  },
     };
 
     // ── Score → color ────────────────────────────────────────────────────────
@@ -473,7 +529,7 @@
         }
 
         const data = await res.json();
-        renderResults(data);
+        renderResults(data, url);
 
       } catch (e) {
         errBox.textContent    = e.message;
@@ -487,7 +543,9 @@
     }
 
     // ── Render full results ──────────────────────────────────────────────────
-    function renderResults(data) {
+    function renderResults(data, url) {
+      _lastResult = data;
+      _lastUrl    = url;
       const color = scoreColor(data.score);
 
       // Main score
@@ -506,6 +564,16 @@
         bar.style.width = data.score + "%";
       });
 
+      // Screenshot
+      const screenshotSection = document.getElementById("screenshot-section");
+      const screenshotImg     = document.getElementById("screenshot-img");
+      if (data.screenshot) {
+        screenshotImg.src = "data:image/png;base64," + data.screenshot;
+        screenshotSection.style.display = "block";
+      } else {
+        screenshotSection.style.display = "none";
+      }
+
       // Stack pills
       const pillsEl = document.getElementById("stack-pills");
       if (data.stack && data.stack.length > 0) {
@@ -518,8 +586,8 @@
 
       // Analyzer breakdown — render in a defined order so layout is consistent
       const order = [
-        "builder_fingerprint", "ai_text", "stack_fingerprint",
-        "content_patterns", "code_patterns", "image_signals",
+        "builder_fingerprint", "ai_text", "visual", "stack_fingerprint",
+        "bundle_scan", "content_patterns", "code_patterns", "image_signals",
       ];
       const breakdown = document.getElementById("breakdown");
       breakdown.innerHTML = order
@@ -528,6 +596,176 @@
         .join("");
 
       document.getElementById("results").style.display = "block";
+    }
+
+    // ── Report download ──────────────────────────────────────────────────────
+    function downloadReport() {
+      if (!_lastResult || !_lastUrl) return;
+      const html     = generateReport(_lastResult, _lastUrl);
+      const blob     = new Blob([html], { type: "text/html" });
+      const a        = document.createElement("a");
+      const domain   = new URL(_lastUrl).hostname.replace(/^www\./, "");
+      const date     = new Date().toISOString().slice(0, 10);
+      a.href         = URL.createObjectURL(blob);
+      a.download     = `isitai-${domain}-${date}.html`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function generateReport(data, url) {
+      const color     = scoreColor(data.score);
+      const timestamp = new Date().toLocaleString();
+      const order     = [
+        "builder_fingerprint", "ai_text", "visual", "stack_fingerprint",
+        "bundle_scan", "content_patterns", "code_patterns", "image_signals",
+      ];
+
+      const screenshotHtml = data.screenshot
+        ? `<div class="section">
+            <div class="section-label">Page Screenshot</div>
+            <img src="data:image/png;base64,${data.screenshot}"
+                 style="width:100%;border-radius:8px;border:1px solid #334155;display:block;" />
+           </div>`
+        : "";
+
+      const stackHtml = data.stack && data.stack.length
+        ? data.stack.map(t => `<span class="pill">${escHtml(t)}</span>`).join("")
+        : `<span style="color:#475569;font-style:italic">None detected</span>`;
+
+      const breakdownHtml = order
+        .filter(k => data.breakdown[k])
+        .map(k => {
+          const r    = data.breakdown[k];
+          const meta = ANALYZERS[k] || { name: k, emoji: "🔎" };
+          const c    = scoreColor(r.score);
+          const pct  = Math.round(r.weight * 100);
+          const items = r.evidence.length
+            ? r.evidence.map(e => `<li>${escHtml(e)}</li>`).join("")
+            : `<li style="color:#475569;font-style:italic">No signals detected</li>`;
+          return `
+            <div class="analyzer">
+              <div class="analyzer-header">
+                <span>${meta.emoji} ${escHtml(meta.name)}</span>
+                <span>
+                  <span style="color:${c};font-weight:700">${r.score}/100</span>
+                  <span style="color:#64748b"> · ${pct}%</span>
+                </span>
+              </div>
+              <div class="bar-track">
+                <div class="bar-fill" style="width:${r.score}%;background:${c}"></div>
+              </div>
+              <ul class="evidence">${items}</ul>
+            </div>`;
+        }).join("");
+
+      return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>isitai report — ${escHtml(url)}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+      background: #0f172a;
+      color: #f1f5f9;
+      padding: 2rem 1rem;
+    }
+    .container { max-width: 680px; margin: 0 auto; }
+    h1 { font-size: 1.5rem; font-weight: 700; color: #38bdf8; margin-bottom: 0.25rem; }
+    .meta { font-size: 0.8rem; color: #64748b; margin-bottom: 2rem; line-height: 1.6; }
+    .meta a { color: #38bdf8; text-decoration: none; }
+    .score-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .score-headline { display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 0.75rem; }
+    .score-number { font-size: 3rem; font-weight: 700; line-height: 1; }
+    .score-label { font-size: 1.1rem; font-weight: 600; }
+    .score-sub { font-size: 0.8rem; color: #64748b; }
+    .bar-track { height: 8px; background: #334155; border-radius: 4px; overflow: hidden; margin-bottom: 0.5rem; }
+    .bar-fill  { height: 100%; border-radius: 4px; }
+    .section { margin-bottom: 1rem; }
+    .section-label {
+      font-size: 0.75rem; color: #64748b;
+      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.5rem;
+    }
+    .pills { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .pill {
+      padding: 0.25rem 0.65rem; border-radius: 999px;
+      font-size: 0.78rem; font-weight: 600;
+      background: #1e293b; border: 1px solid #334155; color: #f1f5f9;
+    }
+    .analyzer {
+      background: #1e293b; border: 1px solid #334155;
+      border-radius: 8px; padding: 1rem; margin-bottom: 0.5rem;
+    }
+    .analyzer-header {
+      display: flex; justify-content: space-between;
+      font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem;
+    }
+    .bar-track { height: 4px; margin-bottom: 0.6rem; }
+    .evidence { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; padding: 0; }
+    .evidence li {
+      font-size: 0.8rem; color: #94a3b8;
+      padding-left: 1rem; position: relative; line-height: 1.4;
+    }
+    .evidence li::before { content: "•"; position: absolute; left: 0; color: #38bdf8; }
+    .disclaimer {
+      margin-top: 1.5rem; padding: 0.75rem 1rem;
+      border-left: 3px solid #334155; color: #64748b;
+      font-size: 0.8rem; line-height: 1.5;
+    }
+    .footer { margin-top: 2rem; font-size: 0.75rem; color: #334155; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 isitai report</h1>
+    <div class="meta">
+      <a href="${escHtml(url)}" target="_blank">${escHtml(url)}</a><br>
+      Generated ${timestamp}
+    </div>
+
+    <div class="score-card">
+      <div class="score-headline">
+        <div class="score-number" style="color:${color}">${data.score}</div>
+        <div>
+          <div class="score-label" style="color:${color}">${escHtml(data.label)}</div>
+          <div class="score-sub">/ 100</div>
+        </div>
+      </div>
+      <div class="bar-track" style="height:8px">
+        <div class="bar-fill" style="width:${data.score}%;background:${color}"></div>
+      </div>
+    </div>
+
+    ${screenshotHtml}
+
+    <div class="section">
+      <div class="section-label">Detected Technologies</div>
+      <div class="pills">${stackHtml}</div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Analyzer Breakdown</div>
+      ${breakdownHtml}
+    </div>
+
+    <p class="disclaimer">
+      ⚠ This is a confidence estimate, not a verdict. Scores are a weighted
+      average of analyzers that found signals — analyzers that found nothing
+      are excluded from the calculation.
+    </p>
+
+    <div class="footer">Generated by isitai</div>
+  </div>
+</body>
+</html>`;
     }
 
     // ── Utility: escape HTML special chars ──────────────────────────────────
@@ -544,6 +782,16 @@
     // ── Allow Enter key to submit ────────────────────────────────────────────
     document.getElementById("url-input")
       .addEventListener("keydown", e => { if (e.key === "Enter") analyze(); });
+
+    // ── ?url= query param — used by the browser extension's "View full report" ─
+    // If the page is opened with ?url=https://example.com, pre-fill the input
+    // and auto-run the analysis so the user lands straight on the full breakdown.
+    const params = new URLSearchParams(window.location.search);
+    const prefilledUrl = params.get("url");
+    if (prefilledUrl) {
+      document.getElementById("url-input").value = prefilledUrl;
+      analyze();
+    }
   </script>
 </body>
 </html>

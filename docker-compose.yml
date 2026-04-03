@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    # Mount app/ and static/ so code changes reflect without rebuilding.
+    # The Playwright Chromium binary lives inside the container and is
+    # unaffected by the volume mount.
+    volumes:
+      - ./app:/app/app
+      - ./static:/app/static
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

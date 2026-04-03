@@ -9,3 +9,5 @@ from dotenv import load_dotenv
 load_dotenv()
 
 HF_API_KEY: str | None = os.getenv("HF_API_KEY") or None
+ANTHROPIC_API_KEY: str | None = os.getenv("ANTHROPIC_API_KEY") or None
+OPENAI_API_KEY: str | None = os.getenv("OPENAI_API_KEY") or None

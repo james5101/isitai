@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "isitai",
+  "description": "Detect AI-generated and vibe-coded websites",
+  "version": "1.0.0",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "isitai — AI Website Detector"
+  },
+  "permissions": [
+    "activeTab",
+    "storage"
+  ]
+}

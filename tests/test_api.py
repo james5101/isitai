@@ -27,7 +27,7 @@ def test_analyze_html_ai_site():
     assert "breakdown" in data
     assert set(data["breakdown"].keys()) == {
         "builder_fingerprint", "content_patterns", "code_patterns",
-        "image_signals", "ai_text", "stack_fingerprint", "bundle_scan"
+        "image_signals", "ai_text", "stack_fingerprint", "bundle_scan", "visual"
     }
 
 
